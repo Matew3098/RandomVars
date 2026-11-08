@@ -102,5 +102,100 @@ ui <- navbarPage(
       )
     )
   )
-  # Agregar pestañas 3 al 5
+
+  # =========================================================================
+  # PESTAÑA 3: Generación de Variables Aleatorias Discretas
+  # =========================================================================
+  tabPanel("Variables Discretas",
+    sidebarLayout(
+      sidebarPanel(
+        width = 3,
+        h4("Configuración Discreta"),
+        selectInput("disc_tipo", "Tipo de Distribución:",
+                    choices = c("Binomial" = "binomial",
+                                "Poisson" = "poisson",
+                                "Geométrica" = "geometrica",
+                                "Personalizada (Transformación Inversa)" = "personalizada")),
+        sliderInput("disc_n_sim", "Tamaño de muestra:", min = 100, max = 10000, value = 1000, step = 100),
+        conditionalPanel(
+          condition = "input.disc_tipo == 'binomial'",
+          numericInput("disc_binom_size", "Ensayos (n):", value = 10),
+          sliderInput("disc_binom_prob", "Probabilidad (p):", min = 0.01, max = 0.99, value = 0.5)
+        ),
+        conditionalPanel(
+          condition = "input.disc_tipo == 'poisson'",
+          numericInput("disc_pois_lambda", "Lambda (lambda):", value = 3.5)
+        ),
+        conditionalPanel(
+          condition = "input.disc_tipo == 'geometrica'",
+          sliderInput("disc_geom_prob", "Probabilidad (p):", min = 0.01, max = 0.99, value = 0.4)
+        ),
+        conditionalPanel(
+          condition = "input.disc_tipo == 'personalizada'",
+          textAreaInput("disc_vals", "Valores X (separados por coma):", value = "1, 2, 3, 4"),
+          textAreaInput("disc_probs", "Probabilidades P(X=x) (suman 1):", value = "0.1, 0.3, 0.4, 0.2")
+        ),
+        actionButton("disc_calcular", "Simular Discreta", class = "btn-primary w-100"),
+        hr(),
+        downloadButton("disc_dl_excel", "Exportar .xlsx", class = "w-100 mb-2"),
+        downloadButton("disc_dl_txt", "Exportar .txt", class = "w-100")
+      ),
+      mainPanel(
+        width = 9,
+        plotOutput("disc_plot_bar", height = "400px"),
+        hr(),
+        h4("Resumen Descriptivo"),
+        verbatimTextOutput("disc_resumen")
+      )
+    )
+  ),
+  
+  # =========================================================================
+  # PESTAÑA 4: Generación de Variables Aleatorias Continuas
+  # =========================================================================
+  tabPanel("Variables Continuas",
+    sidebarLayout(
+      sidebarPanel(
+        width = 3,
+        h4("Configuración Continua"),
+        selectInput("cont_tipo", "Tipo de Distribución:",
+                    choices = c("Uniforme" = "uniforme",
+                                "Exponencial" = "exponencial",
+                                "Normal" = "normal",
+                                "Personalizada (Aceptación/Rechazo o Inv.)" = "personalizada")),
+        numericInput("cont_n_sim", "Tamaño de muestra:", value = 1000, min = 100),
+        conditionalPanel(
+          condition = "input.cont_tipo == 'uniforme'",
+          numericInput("cont_unif_min", "Mínimo (a):", value = 0),
+          numericInput("cont_unif_max", "Máximo (b):", value = 1)
+        ),
+        conditionalPanel(
+          condition = "input.cont_tipo == 'exponencial'",
+          numericInput("cont_exp_rate", "Rate (lambda):", value = 1.0)
+        ),
+        conditionalPanel(
+          condition = "input.cont_tipo == 'normal'",
+          numericInput("cont_norm_mean", "Media (mu):", value = 0),
+          numericInput("cont_norm_sd", "Desviación Estándar (sigma):", value = 1)
+        ),
+        conditionalPanel(
+          condition = "input.cont_tipo == 'personalizada'",
+          textInput("cont_f_densidad", "Densidad f(x):", value = "2*x"),
+          numericInput("cont_lim_inf", "Límite Inferior Soporte:", value = 0),
+          numericInput("cont_lim_sup", "Límite Superior Soporte:", value = 1)
+        ),
+        actionButton("cont_calcular", "Simular Continua", class = "btn-primary w-100"),
+        hr(),
+        downloadButton("cont_dl_excel", "Exportar .xlsx", class = "w-100 mb-2"),
+        downloadButton("cont_dl_txt", "Exportar .txt", class = "w-100")
+      ),
+      mainPanel(
+        width = 9,
+        fluidRow(
+          column(6, plotOutput("cont_plot_hist", height = "350px")),
+          column(6, plotOutput("cont_plot_cdf", height = "350px"))
+        )
+      )
+    )
+  )
 )
