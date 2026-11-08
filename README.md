@@ -1,0 +1,1 @@
+Repositorio con los archivos ui.R y server.R; para correr la aplicación en Shiny acerca de generación de variables aleatorias y números pseudoaleatorios.
