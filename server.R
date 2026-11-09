@@ -4,6 +4,19 @@ library(shiny)
 # library(ggplot2)
 # library(nortest)
 # library(tseries)
+mti <- function(n, probs, labels) {
+  ord <- order(probs, decreasing = TRUE)
+  probs_ord <- probs[ord]
+  labels_ord <- labels[ord]
+
+  F_x <- cumsum(probs_ord)
+
+  U <- runif(n)
+
+  pos <- findInterval(U, c(0, F_x), rightmost.closed = TRUE)
+
+  return(labels_ord[pos])
+}
 
 server <- function(input, output, session) {
   # =========================================================================
@@ -79,9 +92,34 @@ server <- function(input, output, session) {
   }
 
   # Pestaña 3: Variables Aleatorias Discretas
-  simular_discreta <- function(tipo, n_sim, ...) {
-    # TODO: Generar Binomial, Poisson, Geométrica o Personalizada (Transformación Inversa Discreta)
-    return(NULL)
+  simular_discreta <- function(tipo, n_sim) {
+    res <- switch(
+      tipo,
+      "binomial" = {
+        rbinom(
+          n = input$disc_n_sim,
+          size = input$disc_binom_size,
+          p = input$disc_binom_prob
+        )
+      },
+      "poisson" = {
+        rpois(n = input$disc_n_sim, lambda = input$disc_pois_lambda)
+      },
+      "geometrica" = {
+        rgeom(n = input$disc_n_sim, prob = input$disc_geom_prob)
+      },
+      "personalizada" = {
+        vals <- as.numeric(unlist(strsplit(input$disc_vals, ",")))
+        probs <- as.numeric(unlist(strsplit(input$disc_probs, ",")))
+        if (abs(sum(probs) - 1) < 1e-6) {
+          mti(n = input$disc_n_sim, probs = probs, labels = vals)
+        } else {
+          stop("Las probabilidades ingresadas no suman 1.")
+        }
+      },
+      stop("Tipo de distribución no reconocido")
+    )
+    return(res)
   }
 
   # Pestaña 4: Variables Aleatorias Continuas
@@ -132,8 +170,31 @@ server <- function(input, output, session) {
 
   # Reactivo Pestaña 3: Variables Discretas
   datos_discretos <- eventReactive(input$disc_calcular, {
-    # req(input$disc_tipo, input$disc_n_sim)
-    return(NULL)
+    req(input$disc_tipo, input$disc_n_sim)
+    muestra <- simular_discreta(input$disc_tipo, input$disc_n_sim)
+    validate(need(!is.null(muestra), "No se pudo ejecutar la simulación."))
+
+    # Distribución teórica en el soporte observado
+    x <- sort(unique(muestra))
+    teorica <- switch(
+      input$disc_tipo,
+      "binomial" = dbinom(x, input$disc_binom_size, input$disc_binom_prob),
+      "poisson" = dpois(x, input$disc_pois_lambda),
+      "geometrica" = dgeom(x, input$disc_geom_prob),
+      "personalizada" = {
+        vals <- as.numeric(unlist(strsplit(input$disc_vals, ",")))
+        probs <- as.numeric(unlist(strsplit(input$disc_probs, ",")))
+        probs[match(x, vals)]
+      }
+    )
+
+    return(list(
+      tipo = input$disc_tipo,
+      muestra = muestra,
+      x = x,
+      empirica = as.numeric(table(muestra)) / length(muestra),
+      teorica = teorica
+    ))
   })
 
   # Reactivo Pestaña 4: Variables Continuas
@@ -237,32 +298,56 @@ server <- function(input, output, session) {
   # =========================================================================
 
   output$disc_plot_bar <- renderPlot({
-    # res <- datos_discretos()
-    # req(res)
-    # TODO: Gráfico de barras comparativo (empírico vs. teórico)
+    res <- datos_discretos()
+    req(res, res$muestra)
+    barplot(
+      rbind(res$empirica, res$teorica),
+      beside = TRUE,
+      names.arg = res$x,
+      col = c("#d7a87c", "#4a646c"),
+      xlab = "x",
+      ylab = "Probabilidad",
+      legend.text = c("Empírica", "Teórica")
+    )
   })
 
   output$disc_resumen <- renderPrint({
-    # res <- datos_discretos()
-    # req(res)
-    # TODO: Resumen descriptivo
+    res <- datos_discretos()
+    req(res, res$muestra)
+    cat('La media de los datos es: ', mean(res$muestra), '\n')
+    cat('La varianza es: ', var(res$muestra), '\n')
+    cat(
+      'El error de probabilidad medio es: ',
+      mean(abs(res$teorica - res$empirica)),
+      '\n'
+    )
   })
 
   output$disc_dl_excel <- downloadHandler(
     filename = function() {
-      paste0("variables_discretas_", Sys.Date(), ".xlsx")
+      res <- datos_discretos()
+      tipo_str <- if (!is.null(res$tipo)) res$tipo else "discreta"
+      paste0("Datos_aleatorios_", tipo_str, "_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      # TODO: Descarga en .xlsx
+      res <- datos_discretos()
+      req(res, res$muestra)
+      df <- data.frame(simulacion = seq_along(res$muestra), valor = res$muestra)
+      writexl::write_xlsx(df, path = file)
     }
   )
 
   output$disc_dl_txt <- downloadHandler(
     filename = function() {
-      paste0("variables_discretas_", Sys.Date(), ".csv")
+      res <- datos_discretos()
+      tipo_str <- if (!is.null(res$tipo)) res$tipo else "discreta"
+      paste0("Datos_aleatorios_", tipo_str, "_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      # TODO: Descarga en .txt / .csv
+      res <- datos_discretos()
+      req(res, res$muestra)
+      df <- data.frame(simulacion = seq_along(res$muestra), valor = res$muestra)
+      write.csv(df, file = file, row.names = FALSE)
     }
   )
 
