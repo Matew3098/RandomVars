@@ -1,5 +1,6 @@
 library(shiny)
 library(bslib)
+library(plotly)
 
 ui <- navbarPage(
   title = "Simulación y Métodos Numéricos - EPN",
@@ -31,9 +32,9 @@ ui <- navbarPage(
           step = 10
         ),
         numericInput("gen_semilla", "Semilla inicial (x0):", value = 4122),
-        numericInput("gen_a", "Multiplicador (a):", value = 1664525),
-        numericInput("gen_c", "Incremento (c):", value = 1013904223),
-        numericInput("gen_m", "Módulo (m):", value = 2^32),
+        numericInput("gen_a", "Multiplicador (a):", value = 1525),
+        numericInput("gen_c", "Incremento (c):", value = 76),
+        numericInput("gen_m", "Módulo (m):", value = 7),
         hr(),
         actionButton(
           "gen_calcular",
@@ -51,7 +52,7 @@ ui <- navbarPage(
           tabPanel(
             "Gráficos y Resumen",
             fluidRow(
-              column(6, plotOutput("gen_plot_hist", height = "350px")),
+              column(6, plotlyOutput("gen_plot_hist", height = "350px")),
               column(
                 6,
                 h4("Resumen Estadístico"),
@@ -101,7 +102,7 @@ ui <- navbarPage(
         verbatimTextOutput("mc_resultados")
       )
     )
-  )
+  ),
 
   # =========================================================================
   # PESTAÑA 3: Generación de Variables Aleatorias Discretas
