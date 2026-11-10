@@ -1,9 +1,10 @@
 library(shiny)
-# Cargar librerías adicionales según se requieran:
-# library(openpyxl)
-# library(ggplot2)
-# library(nortest)
-# library(tseries)
+library(ggplot2)
+library(nortest)
+library(tseries)
+library(openxlsx)
+library(plotly)
+
 mti <- function(n, probs, labels) {
   ord <- order(probs, decreasing = TRUE)
   probs_ord <- probs[ord]
