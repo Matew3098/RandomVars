@@ -130,9 +130,72 @@ server <- function(input, output, session) {
   }
 
   # Pestaña 5: Pruebas de Bondad de Ajuste y Diagnóstico
-  ejecutar_pruebas_bondad <- function(datos, alpha, pruebas) {
-    # TODO: Aplicar Prueba Kolmogorov-Smirnov (KS) y Prueba de Rachas (Runs Test)
-    return(NULL)
+  ejecutar_pruebas_bondad <- function(
+    datos,
+    alpha = 0.05,
+    pruebas = c("ks", "runs")
+  ) {
+    resultados <- list()
+
+    # 1. Prueba de Kolmogorov-Smirnov (Uniformidad en [0, 1])
+    if ("ks" %in% pruebas) {
+      test_ks <- suppressWarnings(ks.test(datos, "punif", min = 0, max = 1))
+      p_ks <- test_ks$p.value
+      resultados[["ks"]] <- data.frame(
+        Prueba = "Kolmogorov-Smirnov (Uniformidad)",
+        Estadístico = round(as.numeric(test_ks$statistic), 5),
+        P_Valor = round(p_ks, 5),
+        Decisión = ifelse(
+          p_ks > alpha,
+          "No se rechaza H0 (Uniforme)",
+          "Se rechaza H0"
+        ),
+        stringsAsFactors = FALSE
+      )
+    }
+
+    # 2. Prueba de Rachas / Runs Test (Independencia)
+    if ("runs" %in% pruebas) {
+      dicotomica <- factor(datos > median(datos))
+
+      if (nlevels(dicotomica) == 2) {
+        test_runs <- tseries::runs.test(dicotomica)
+        p_runs <- test_runs$p.value
+        resultados[["runs"]] <- data.frame(
+          Prueba = "Prueba de Rachas (Independencia)",
+          Estadístico = round(as.numeric(test_runs$statistic), 5),
+          P_Valor = round(p_runs, 5),
+          Decisión = ifelse(
+            p_runs > alpha,
+            "No se rechaza H0 (Independiente)",
+            "Se rechaza H0"
+          ),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        resultados[["runs"]] <- data.frame(
+          Prueba = "Prueba de Rachas (Independencia)",
+          Estadístico = NA,
+          P_Valor = NA,
+          Decisión = "Error: datos constantes (sin variación)",
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+
+    tabla_final <- if (length(resultados) > 0) {
+      do.call(rbind, resultados)
+    } else {
+      data.frame(Mensaje = "Selecciona al menos una prueba estadística.")
+    }
+
+    rownames(tabla_final) <- NULL
+
+    return(list(
+      datos = datos,
+      alpha = alpha,
+      tabla = tabla_final
+    ))
   }
 
   # =========================================================================
@@ -148,9 +211,8 @@ server <- function(input, output, session) {
 
   # Reactivo Pestaña 2: Montecarlo
   datos_montecarlo <- eventReactive(input$mc_calcular, {
-    req(input$mc_funcion, input$mc_a, input$mc_b, input$mc_N) # Verficicamos que tengamos desde el ui los datos necesarios para ejecutar ls simulación
+    req(input$mc_funcion, input$mc_a, input$mc_b, input$mc_N)
     res <- integrar_montecarlo(
-      # Con los datos validados ejecuto la expresión
       expr_str = input$mc_funcion,
       a = input$mc_a,
       b = input$mc_b,
@@ -175,7 +237,6 @@ server <- function(input, output, session) {
     muestra <- simular_discreta(input$disc_tipo, input$disc_n_sim)
     validate(need(!is.null(muestra), "No se pudo ejecutar la simulación."))
 
-    # Distribución teórica en el soporte observado
     x <- sort(unique(muestra))
     teorica <- switch(
       input$disc_tipo,
@@ -206,19 +267,59 @@ server <- function(input, output, session) {
 
   # Reactivo Pestaña 5: Carga o selección de muestra para Diagnóstico
   datos_diagnostico <- eventReactive(input$test_ejecutar, {
-    # Si input$test_origen == "p1", tomar datos_pseudoaleatorios()
-    # Si input$test_origen == "archivo", leer input$test_file$datapath
-    return(NULL)
+    req(input$test_origen)
+
+    u <- switch(
+      input$test_origen,
+      "p1" = {
+        res_p1 <- datos_pseudoaleatorios()
+        req(res_p1, res_p1$muestra)
+        as.numeric(res_p1$muestra)
+      },
+      "archivo" = {
+        req(input$test_file)
+        ext <- tools::file_ext(input$test_file$name)
+
+        df <- switch(
+          tolower(ext),
+          "csv" = read.csv(input$test_file$datapath),
+          "txt" = read.table(input$test_file$datapath, header = TRUE),
+          "xlsx" = openxlsx::read.xlsx(input$test_file$datapath),
+          validate("Formato no soportado. Sube un archivo .csv, .txt o .xlsx")
+        )
+        as.numeric(na.omit(df[[1]]))
+      }
+    )
+
+    validate(
+      need(
+        length(u) >= 10,
+        "Se necesitan al menos 10 datos numéricos válidos para ejecutar las pruebas."
+      )
+    )
+
+    alpha <- if (!is.null(input$test_alpha)) input$test_alpha else 0.05
+    pruebas_sel <- if (!is.null(input$test_pruebas)) {
+      input$test_pruebas
+    } else {
+      c("ks", "runs")
+    }
+
+    return(ejecutar_pruebas_bondad(
+      datos = u,
+      alpha = alpha,
+      pruebas = pruebas_sel
+    ))
   })
 
   # =========================================================================
   # PESTAÑA 1: GENERACIÓN DE NÚMEROS PSEUDOALEATORIOS (OUTPUTS)
   # =========================================================================
 
-  output$gen_plot_hist <- renderPlot({
+  output$gen_plot_hist <- renderPlotly({
     # datos <- datos_pseudoaleatorios()
     # req(datos)
-    # TODO: Histograma interactivo ajustado a la densidad uniforme U(0,1)
+    # TODO: Histograma interactivo ajustado a la densidad uniforme U(0,1) con ggplotly()
   })
 
   output$gen_resumen_stats <- renderPrint({
@@ -256,34 +357,51 @@ server <- function(input, output, session) {
   # PESTAÑA 2: APROXIMACIÓN DE INTEGRALES POR MONTECARLO (OUTPUTS)
   # =========================================================================
 
-  output$mc_plot_geom <- renderPlot({
+  output$mc_plot_geom <- renderPlotly({
     res <- datos_montecarlo()
     req(res)
-    plot(
-      res$x_sim,
-      res$y_sim,
-      type = 'p',
-      col = '#d7a87c',
-      pch = 16,
-      xlab = "X",
-      ylab = "f(X)",
-      main = "Simulación Monte Carlo"
-    )
+
+    df_pts <- data.frame(x = res$x_sim, y = res$y_sim)
+
+    p <- ggplot(df_pts, aes(x = x, y = y)) +
+      geom_point(color = "#18bc9c", alpha = 0.6, size = 1.8) +
+      stat_function(fun = res$f, color = "#8e44ad", linewidth = 1) +
+      labs(
+        title = "Simulación Monte Carlo",
+        x = "X",
+        y = "f(X)"
+      ) +
+      theme_minimal()
+
+    ggplotly(p)
   })
 
-  output$mc_plot_conv <- renderPlot({
+  output$mc_plot_conv <- renderPlotly({
     res <- datos_montecarlo()
     req(res)
-    plot(
-      1:res$N,
-      res$conv_estimates,
-      type = "l",
-      col = '#4a646c',
-      xlab = 'Numero de simulaciones',
-      ylab = 'Acumulado de la integral',
-      main = 'Evolución de la integral',
-    )
-    abline(h = res$ref, col = '#c0a7de')
+
+    df_conv <- data.frame(sim = 1:res$N, est = res$conv_estimates)
+
+    p <- ggplot(df_conv, aes(x = sim, y = est)) +
+      geom_line(color = "#18bc9c", linewidth = 0.8) +
+      labs(
+        title = "Evolución de la integral",
+        x = "Número de simulaciones",
+        y = "Acumulado de la integral"
+      ) +
+      theme_minimal()
+
+    if (!is.na(res$ref)) {
+      p <- p +
+        geom_hline(
+          yintercept = res$ref,
+          color = "#c0a7de",
+          linetype = "dashed",
+          linewidth = 1
+        )
+    }
+
+    ggplotly(p)
   })
 
   output$mc_resultados <- renderPrint({
@@ -298,18 +416,37 @@ server <- function(input, output, session) {
   # PESTAÑA 3: GENERACIÓN DE VARIABLES ALEATORIAS DISCRETAS (OUTPUTS)
   # =========================================================================
 
-  output$disc_plot_bar <- renderPlot({
+  output$disc_plot_bar <- renderPlotly({
     res <- datos_discretos()
     req(res, res$muestra)
-    barplot(
-      rbind(res$empirica, res$teorica),
-      beside = TRUE,
-      names.arg = res$x,
-      col = c("#d7a87c", "#4a646c"),
-      xlab = "x",
-      ylab = "Probabilidad",
-      legend.text = c("Empírica", "Teórica")
+
+    df_bar <- rbind(
+      data.frame(
+        x = factor(res$x),
+        Probabilidad = res$empirica,
+        Tipo = "Empírica"
+      ),
+      data.frame(
+        x = factor(res$x),
+        Probabilidad = res$teorica,
+        Tipo = "Teórica"
+      )
     )
+
+    p <- ggplot(df_bar, aes(x = x, y = Probabilidad, fill = Tipo)) +
+      geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+      scale_fill_manual(
+        values = c("Empírica" = "#18bc9c", "Teórica" = "#8e44ad")
+      ) +
+      labs(
+        title = "Distribución Empírica vs. Teórica",
+        x = "x",
+        y = "Probabilidad",
+        fill = ""
+      ) +
+      theme_minimal()
+
+    ggplotly(p)
   })
 
   output$disc_resumen <- renderPrint({
@@ -356,16 +493,16 @@ server <- function(input, output, session) {
   # PESTAÑA 4: GENERACIÓN DE VARIABLES ALEATORIAS CONTINUAS (OUTPUTS)
   # =========================================================================
 
-  output$cont_plot_hist <- renderPlot({
+  output$cont_plot_hist <- renderPlotly({
     # res <- datos_continuos()
     # req(res)
-    # TODO: Histograma con curva de densidad empírica frente a la teórica
+    # TODO: Histograma con curva de densidad empírica frente a la teórica con ggplotly()
   })
 
-  output$cont_plot_cdf <- renderPlot({
+  output$cont_plot_cdf <- renderPlotly({
     # res <- datos_continuos()
     # req(res)
-    # TODO: CDF empírica vs. teórica
+    # TODO: CDF empírica vs. teórica con ggplotly()
   })
 
   output$cont_dl_excel <- downloadHandler(
@@ -390,21 +527,75 @@ server <- function(input, output, session) {
   # PESTAÑA 5: PRUEBAS DE BONDAD DE AJUSTE Y DIAGNÓSTICO (OUTPUTS)
   # =========================================================================
 
-  output$test_tabla_resultados <- renderTable({
-    # res <- datos_diagnostico()
-    # req(res)
-    # TODO: Tabla con estadístico de prueba, p-valor y decisión (alfa configurable)
+  output$test_tabla_resultados <- renderTable(
+    {
+      res <- datos_diagnostico()
+      req(res, res$tabla)
+      res$tabla
+    },
+    digits = 4,
+    striped = TRUE,
+    hover = TRUE,
+    bordered = TRUE
+  )
+
+  output$test_plot_1 <- renderPlotly({
+    res <- datos_diagnostico()
+    req(res, res$datos)
+
+    n <- length(res$datos)
+    df_qq <- data.frame(
+      teoricos = qunif(ppoints(n), min = 0, max = 1),
+      empiricos = sort(res$datos)
+    )
+
+    p <- ggplot(df_qq, aes(x = teoricos, y = empiricos)) +
+      geom_point(color = "#18bc9c", alpha = 0.25, size = 1.8) +
+      geom_abline(
+        slope = 1,
+        intercept = 0,
+        color = "#8e44ad",
+        linetype = "dashed",
+        linewidth = 1
+      ) +
+      coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +
+      labs(
+        title = "Q-Q Plot Uniforme(0, 1)",
+        x = "Cuantiles Teóricos U(0,1)",
+        y = "Cuantiles Empíricos"
+      ) +
+      theme_minimal()
+
+    ggplotly(p)
   })
 
-  output$test_plot_1 <- renderPlot({
-    # res <- datos_diagnostico()
-    # req(res)
-    # TODO: Gráfico diagnóstico 1 (p. ej. P-P plot / Q-Q plot o ajuste de densidad)
-  })
+  output$test_plot_2 <- renderPlotly({
+    res <- datos_diagnostico()
+    req(res, res$datos)
 
-  output$test_plot_2 <- renderPlot({
-    # res <- datos_diagnostico()
-    # req(res)
-    # TODO: Gráfico diagnóstico 2 (p. ej. dispersión temporal para independencia)
+    df_seq <- data.frame(
+      indice = seq_along(res$datos),
+      valor = res$datos
+    )
+
+    p <- ggplot(df_seq, aes(x = indice, y = valor)) +
+      geom_bin2d(bins = 50) +
+      scale_fill_gradient(low = "#e8f8f5", high = "#18bc9c") +
+      geom_hline(
+        yintercept = 0.5,
+        color = "#8e44ad",
+        linetype = "dashed",
+        linewidth = 0.9
+      ) +
+      coord_cartesian(ylim = c(0, 1)) +
+      labs(
+        title = "Dispersión Secuencial (Densidad)",
+        x = "Índice (i)",
+        y = "Valor U_i",
+        fill = "Frecuencia"
+      ) +
+      theme_minimal()
+
+    ggplotly(p)
   })
 }
