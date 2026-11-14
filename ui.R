@@ -1,5 +1,6 @@
 library(shiny)
 library(bslib)
+library(plotly)
 
 ui <- navbarPage(
   title = "Simulación y Métodos Numéricos - EPN",
@@ -51,7 +52,7 @@ ui <- navbarPage(
           tabPanel(
             "Gráficos y Resumen",
             fluidRow(
-              column(6, plotOutput("gen_plot_hist", height = "350px")),
+              column(6, plotlyOutput("gen_plot_hist", height = "350px")),
               column(
                 6,
                 h4("Resumen Estadístico"),
@@ -93,8 +94,8 @@ ui <- navbarPage(
       mainPanel(
         width = 9,
         fluidRow(
-          column(6, plotOutput("mc_plot_geom", height = "350px")),
-          column(6, plotOutput("mc_plot_conv", height = "350px"))
+          column(6, plotlyOutput("mc_plot_geom", height = "350px")),
+          column(6, plotlyOutput("mc_plot_conv", height = "350px"))
         ),
         hr(),
         h4("Resultados Numéricos"),
@@ -192,9 +193,20 @@ ui <- navbarPage(
       ),
       mainPanel(
         width = 9,
-        plotOutput("disc_plot_bar", height = "400px"),
+        plotlyOutput("disc_plot_bar", height = "400px"),
         hr(),
         h4("Resumen Descriptivo"),
+        tags$head(
+          tags$style(HTML(
+            "
+            #disc_resumen {
+                font-size: 16px;
+                font-family: Arial;
+                line-height: 1.5;
+                }
+            "
+          ))
+        ),
         verbatimTextOutput("disc_resumen")
       )
     )
@@ -261,8 +273,8 @@ ui <- navbarPage(
       mainPanel(
         width = 9,
         fluidRow(
-          column(6, plotOutput("cont_plot_hist", height = "350px")),
-          column(6, plotOutput("cont_plot_cdf", height = "350px"))
+          column(6, plotlyOutput("cont_plot_hist", height = "350px")),
+          column(6, plotlyOutput("cont_plot_cdf", height = "350px"))
         )
       )
     )
@@ -290,7 +302,7 @@ ui <- navbarPage(
           fileInput(
             "test_file",
             "Seleccionar archivo (.csv / .xlsx):",
-            accept = c(".csv", ".xlsx", ".xls")
+            accept = c(".csv", ".xlsx", ".xls", ".txt")
           )
         ),
         hr(),
@@ -308,9 +320,9 @@ ui <- navbarPage(
           "Seleccionar Pruebas:",
           choices = c(
             "Prueba Kolmogorov-Smirnov (KS)" = "ks",
-            "Prueba de Rachas (Runs Test)" = "rachas"
+            "Prueba de Rachas (Runs Test)" = "runs"
           ),
-          selected = c("ks", "rachas")
+          selected = c("ks", "runs")
         ),
         actionButton(
           "test_ejecutar",
@@ -325,8 +337,8 @@ ui <- navbarPage(
         hr(),
         h4("Gráficos Diagnósticos"),
         fluidRow(
-          column(6, plotOutput("test_plot_1", height = "300px")),
-          column(6, plotOutput("test_plot_2", height = "300px"))
+          column(6, plotlyOutput("test_plot_1", height = "300px")),
+          column(6, plotlyOutput("test_plot_2", height = "300px"))
         )
       )
     )
