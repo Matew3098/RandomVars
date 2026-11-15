@@ -31,10 +31,14 @@ ui <- navbarPage(
           min = 10,
           step = 10
         ),
-        numericInput("gen_semilla", "Semilla inicial (x0):", value = 4122),
+        numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
         numericInput("gen_a", "Multiplicador (a):", value = 1664525),
         numericInput("gen_c", "Incremento (c):", value = 1013904223),
         numericInput("gen_m", "Módulo (m):", value = 2^32),
+        # Valores para MCL: x0=12345 , a=1664525 , c=1013904223 , m=2^32
+        # Valores para MLehmer: x0=4122 , c=76 , N=50
+        # Valores para MCM: x0=5735 , N=50
+        
         hr(),
         actionButton(
           "gen_calcular",
@@ -110,7 +114,6 @@ ui <- navbarPage(
             "
           ))
         ),
-
         verbatimTextOutput("mc_resultados")
       )
     )
