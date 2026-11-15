@@ -156,9 +156,71 @@ server <- function(input, output, session) {
   }
 
   # Pestaña 4: Variables Aleatorias Continuas
-  simular_continua <- function(tipo, n_sim, ...) {
+  simular_continua <- function(tipo, n_sim) {
     # TODO: Generar Uniforme, Exponencial, Normal o Personalizada (Inversa / Aceptación y Rechazo)
-    return(NULL)
+    if (tipo == "uniforme") {
+      a <- input$cont_unif_min
+      b <- input$cont_unif_max
+      muestra <- runif(n_sim, min = a, max = b)
+      f_teorica <- function(x) dunif(x, min = a, max = b)
+      F_teorica <- function(x) punif(x, min = a, max = b)
+    } else if (tipo == "exponencial") {
+      lambda <- input$cont_exp_rate
+      muestra <- rexp(n_sim, rate = lambda)
+      f_teorica <- function(x) dexp(x, rate = lambda)
+      F_teorica <- function(x) pexp(x, rate = lambda)
+    } else if (tipo == "normal") {
+      mu <- input$cont_norm_mean
+      sigma <- input$cont_norm_sd
+      muestra <- rnorm(n_sim, mean = mu, sd = sigma)
+      f_teorica <- function(x) dnorm(x, mean = mu, sd = sigma)
+      F_teorica <- function(x) pnorm(x, mean = mu, sd = sigma)
+    } else if (tipo == "personalizada") {
+      a <- input$cont_lim_inf
+      b <- input$cont_lim_sup
+      expr_str <- input$cont_f_densidad
+      
+      # Transformación inversa numérica aproximada para f(x) en [a, b]
+      U <- runif(n_sim)
+      # Generamos una malla fina para evaluar la CDF acumulada numérica
+      grid_x <- seq(a, b, length.out = 1000)
+      f_eval <- tryCatch({
+        sapply(grid_x, function(x) eval(parse(text = expr_str)))
+      }, error = function(e) NULL)
+      
+      validate(need(!is.null(f_eval), "Error en la expresión de la densidad f(x). Verifica la sintaxis."))
+      
+      # Normalizamos por si acaso el área no es exactamente 1 en el soporte dado
+      dx <- grid_x[2] - grid_x[1]
+      area <- sum(f_eval) * dx
+      f_eval_norm <- f_eval / area
+      
+      # Construir CDF empírica numérica en la malla
+      cdf_eval <- cumsum(f_eval_norm) * dx
+      cdf_eval[length(cdf_eval)] <- 1 # Asegurar 1 al final
+      
+      # Método de Transformación Inversa por interpolación lineal
+      muestra <- approx(x = cdf_eval, y = grid_x, xout = U, rule = 2)$y
+      f_teorica <- function(x) {
+        ifelse(x >= a & x <= b, eval(parse(text = expr_str)) / area, 0)
+      }
+      F_teorica <- function(x) {
+        sapply(x, function(val) {
+          if (val <= a) return(0)
+          if (val >= b) return(1)
+          sub_grid <- grid_x[grid_x <= val]
+          if(length(sub_grid) == 0) return(0)
+          sub_f <- f_eval_norm[1:length(sub_grid)]
+          sum(sub_f) * dx
+        })
+      }
+    }
+    return(list(
+      muestra = muestra,
+      tipo = tipo,
+      f_teorica = f_teorica,
+      F_teorica = F_teorica
+    ))
   }
 
   # Pestaña 5: Pruebas de Bondad de Ajuste y Diagnóstico
@@ -189,7 +251,6 @@ server <- function(input, output, session) {
     # 2. Prueba de Rachas / Runs Test (Independencia)
     if ("runs" %in% pruebas) {
       dicotomica <- factor(datos > median(datos))
-
       if (nlevels(dicotomica) == 2) {
         test_runs <- tseries::runs.test(dicotomica)
         p_runs <- test_runs$p.value
@@ -220,9 +281,7 @@ server <- function(input, output, session) {
     } else {
       data.frame(Mensaje = "Selecciona al menos una prueba estadística.")
     }
-
     rownames(tabla_final) <- NULL
-
     return(list(
       datos = datos,
       alpha = alpha,
@@ -301,14 +360,14 @@ server <- function(input, output, session) {
 
   # Reactivo Pestaña 4: Variables Continuas
   datos_continuos <- eventReactive(input$cont_calcular, {
-    # req(input$cont_tipo, input$cont_n_sim)
-    return(NULL)
+    req(input$cont_tipo, input$cont_n_sim)
+    res <- simular_continua(input$cont_tipo, input$cont_n_sim)
+    return(res)
   })
 
   # Reactivo Pestaña 5: Carga o selección de muestra para Diagnóstico
   datos_diagnostico <- eventReactive(input$test_ejecutar, {
     req(input$test_origen)
-
     u <- switch(
       input$test_origen,
       "p1" = {
@@ -319,7 +378,6 @@ server <- function(input, output, session) {
       "archivo" = {
         req(input$test_file)
         ext <- tools::file_ext(input$test_file$name)
-
         df <- switch(
           tolower(ext),
           "csv" = read.csv(input$test_file$datapath),
@@ -357,14 +415,15 @@ server <- function(input, output, session) {
   # =========================================================================
 
   output$gen_plot_hist <- renderPlotly({
-    resultado <- datos_pseudoaleatorios()$U[-1]
+    resultado <- datos_pseudoaleatorios()
     req(resultado)
+    resultado <- resultado$U[-1]
     df <- data.frame(valores = resultado)
     p <- ggplot(df, aes(x = valores)) +
       geom_histogram(aes(y = after_stat(density)), 
-                     fill = "blue",color = "white",bins = 15,alpha = 0.8) +
-      stat_function(fun = dunif, args = list(min = 0, max = 1), color = "red", linewidth = 1) +
-      labs(title = 'Números Aleatorios Generados',x = 'Valores generados',y = "Probabilidad") +
+                     fill = "#18bc9c",color = "white",bins = 15,alpha = 0.8) +
+      stat_function(fun = dunif, args = list(min = 0, max = 1), color = "#8e44ad", linewidth = 1) +
+      labs(title = 'Números Aleatorios Generados',x = 'Valores generados',y = "Densidad") +
       theme_minimal()
     ggplotly(p)
   })
@@ -433,9 +492,7 @@ server <- function(input, output, session) {
   output$mc_plot_geom <- renderPlotly({
     res <- datos_montecarlo()
     req(res)
-
     df_pts <- data.frame(x = res$x_sim, y = res$y_sim)
-
     p <- ggplot(df_pts, aes(x = x, y = y)) +
       geom_point(color = "#18bc9c", alpha = 0.6, size = 1.8) +
       stat_function(fun = res$f, color = "#8e44ad", linewidth = 1) +
@@ -445,16 +502,13 @@ server <- function(input, output, session) {
         y = "f(X)"
       ) +
       theme_minimal()
-
     ggplotly(p)
   })
 
   output$mc_plot_conv <- renderPlotly({
     res <- datos_montecarlo()
     req(res)
-
     df_conv <- data.frame(sim = 1:res$N, est = res$conv_estimates)
-
     p <- ggplot(df_conv, aes(x = sim, y = est)) +
       geom_line(color = "#18bc9c", linewidth = 0.8) +
       labs(
@@ -463,7 +517,6 @@ server <- function(input, output, session) {
         y = "Acumulado de la integral"
       ) +
       theme_minimal()
-
     if (!is.na(res$ref)) {
       p <- p +
         geom_hline(
@@ -473,7 +526,6 @@ server <- function(input, output, session) {
           linewidth = 1
         )
     }
-
     ggplotly(p)
   })
 
@@ -492,7 +544,6 @@ server <- function(input, output, session) {
   output$disc_plot_bar <- renderPlotly({
     res <- datos_discretos()
     req(res, res$muestra)
-
     df_bar <- rbind(
       data.frame(
         x = factor(res$x),
@@ -567,32 +618,62 @@ server <- function(input, output, session) {
   # =========================================================================
 
   output$cont_plot_hist <- renderPlotly({
-    # res <- datos_continuos()
-    # req(res)
-    # TODO: Histograma con curva de densidad empírica frente a la teórica con ggplotly()
+    res <- datos_continuos()
+    req(res)
+    df <- data.frame(valores = res$muestra)
+    p <- ggplot(df, aes(x = valores)) +
+      geom_histogram(aes(y = after_stat(density)), fill = "#18bc9c", color = "white", bins = 25, alpha = 0.7) +
+      stat_function(fun = res$f_teorica, color = "#8e44ad", linewidth = 1.2) +
+      labs(
+        title = "Histograma y Densidad Teórica",
+        x = "x",
+        y = "Densidad"
+      ) +
+      theme_minimal()
+    ggplotly(p)
   })
 
   output$cont_plot_cdf <- renderPlotly({
-    # res <- datos_continuos()
-    # req(res)
-    # TODO: CDF empírica vs. teórica con ggplotly()
+    res <- datos_continuos()
+    req(res)
+    df <- data.frame(valores = res$muestra)
+    p <- ggplot(df, aes(x = valores)) +
+      stat_ecdf(geom = "step", color = "#18bc9c", linewidth = 1) +
+      stat_function(fun = res$F_teorica, color = "#8e44ad", linewidth = 1.1, linetype = "dashed") +
+      labs(
+        title = "Función de Distribución Acumulada (CDF)",
+        x = "x",
+        y = "F(x)"
+      ) +
+      theme_minimal()
+    ggplotly(p)
   })
 
   output$cont_dl_excel <- downloadHandler(
     filename = function() {
-      paste0("variables_continuas_", Sys.Date(), ".xlsx")
+      res <- datos_continuos()
+      tipo_str <- if (!is.null(res$tipo)) res$tipo else "continua"
+      paste0("var_continua_", tipo_str, "_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      # TODO: Descarga en .xlsx
+      res <- datos_continuos()
+      req(res)
+      df <- data.frame(Simulacion = seq_along(res$muestra), Valor = res$muestra)
+      openxlsx::write.xlsx(df, file, rowNames = FALSE)
     }
   )
 
   output$cont_dl_txt <- downloadHandler(
     filename = function() {
-      paste0("variables_continuas_", Sys.Date(), ".csv")
+      res <- datos_continuos()
+      tipo_str <- if (!is.null(res$tipo)) res$tipo else "continua"
+      paste0("var_continua_", tipo_str, "_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      # TODO: Descarga en .txt / .csv
+      res <- datos_continuos()
+      req(res)
+      df <- data.frame(Simulacion = seq_along(res$muestra), Valor = res$muestra)
+      write.csv(df, file, row.names = FALSE)
     }
   )
 
@@ -615,13 +696,11 @@ server <- function(input, output, session) {
   output$test_plot_1 <- renderPlotly({
     res <- datos_diagnostico()
     req(res, res$datos)
-
     n <- length(res$datos)
     df_qq <- data.frame(
       teoricos = qunif(ppoints(n), min = 0, max = 1),
       empiricos = sort(res$datos)
     )
-
     p <- ggplot(df_qq, aes(x = teoricos, y = empiricos)) +
       geom_point(color = "#18bc9c", alpha = 0.25, size = 1.8) +
       geom_abline(
@@ -638,19 +717,16 @@ server <- function(input, output, session) {
         y = "Cuantiles Empíricos"
       ) +
       theme_minimal()
-
     ggplotly(p)
   })
 
   output$test_plot_2 <- renderPlotly({
     res <- datos_diagnostico()
     req(res, res$datos)
-
     df_seq <- data.frame(
       indice = seq_along(res$datos),
       valor = res$datos
     )
-
     p <- ggplot(df_seq, aes(x = indice, y = valor)) +
       geom_bin2d(bins = 50) +
       scale_fill_gradient(low = "#e8f8f5", high = "#18bc9c") +
@@ -668,7 +744,22 @@ server <- function(input, output, session) {
         fill = "Frecuencia"
       ) +
       theme_minimal()
-
+    
+    # A
+    # No hay que buscar segundos motivos en miaw
+    # No ponerlo a prueba
+    # 
+    
+    ------
+      
+    # M
+    # Hacerle saber a miaw cuando las cosas no se sienten bien y posponer el problema
+    
+      
+    ------ 
+      - 
+  
+      
     ggplotly(p)
   })
 }

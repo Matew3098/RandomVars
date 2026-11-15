@@ -24,20 +24,27 @@ ui <- navbarPage(
             "Cuadrados Medios" = "cuadrados"
           )
         ),
-        numericInput(
-          "gen_n",
-          "Cantidad de números (N):",
-          value = 1000,
-          min = 10,
-          step = 10
+        
+       # Los valores por defecto cambian para cada metodo, pues cada uno tiene sus debidas restricciones
+        conditionalPanel(
+          condition = "input.gen_metodo == 'mcl'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 1000, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
+          numericInput("gen_a", "Multiplicador (a):", value = 1664525),
+          numericInput("gen_c", "Incremento (c):", value = 1013904223),
+          numericInput("gen_m", "Módulo (m):", value = 2^32),
         ),
-        numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
-        numericInput("gen_a", "Multiplicador (a):", value = 1664525),
-        numericInput("gen_c", "Incremento (c):", value = 1013904223),
-        numericInput("gen_m", "Módulo (m):", value = 2^32),
-        # Valores para MCL: x0=12345 , a=1664525 , c=1013904223 , m=2^32
-        # Valores para MLehmer: x0=4122 , c=76 , N=50
-        # Valores para MCM: x0=5735 , N=50
+        conditionalPanel(
+          condition = "input.gen_metodo == 'lehmer'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 100, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 4122),
+          numericInput("gen_c", "Constante (c):", value = 76),
+        ),
+        conditionalPanel(
+          condition = "input.gen_metodo == 'cuadrados'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 50, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
+        ),
         
         hr(),
         actionButton(
@@ -238,7 +245,8 @@ ui <- navbarPage(
           "cont_n_sim",
           "Tamaño de muestra:",
           value = 1000,
-          min = 100
+          min = 100,
+          step = 100
         ),
         conditionalPanel(
           condition = "input.cont_tipo == 'uniforme'",
@@ -247,16 +255,12 @@ ui <- navbarPage(
         ),
         conditionalPanel(
           condition = "input.cont_tipo == 'exponencial'",
-          numericInput("cont_exp_rate", "Rate (lambda):", value = 1.0)
+          numericInput("cont_exp_rate", "Rate (lambda):", value = 1.0, min = 0.01, step = 0.1)
         ),
         conditionalPanel(
           condition = "input.cont_tipo == 'normal'",
           numericInput("cont_norm_mean", "Media (mu):", value = 0),
-          numericInput(
-            "cont_norm_sd",
-            "Desviación Estándar (sigma):",
-            value = 1
-          )
+          numericInput("cont_norm_sd","Desviación Estándar (sigma):", value = 1, min = 0.01, step = 0.1)
         ),
         conditionalPanel(
           condition = "input.cont_tipo == 'personalizada'",
@@ -264,14 +268,16 @@ ui <- navbarPage(
           numericInput("cont_lim_inf", "Límite Inferior Soporte:", value = 0),
           numericInput("cont_lim_sup", "Límite Superior Soporte:", value = 1)
         ),
+        hr(),
         actionButton(
           "cont_calcular",
           "Simular Continua",
           class = "btn-primary w-100"
         ),
         hr(),
-        downloadButton("cont_dl_excel", "Exportar .xlsx", class = "w-100 mb-2"),
-        downloadButton("cont_dl_txt", "Exportar .txt", class = "w-100")
+        h4("Exportación"),
+        downloadButton("cont_dl_excel", "Descargar .xlsx", class = "w-100 mb-2"),
+        downloadButton("dl_txt", "Descargar .txt / .csv", class = "w-100")
       ),
       mainPanel(
         width = 9,
