@@ -25,48 +25,51 @@ server <- function(input, output, session) {
   # =========================================================================
 
   # Pestaña 1: Algoritmos de generación de números pseudoaleatorios
-  MCL <- function(a , c , m , x0 , N){
-    res <- numeric(N+1)
-    u <- numeric(N+1) # Contiene los datos normalizados
+  MCL <- function(a, c, m, x0, N) {
+    res <- numeric(N + 1)
+    u <- numeric(N + 1) # Contiene los datos normalizados
     res[1] <- x0
-    for(i in 2:(N+1)){
-      res[i] <- (a*res[i-1] + c) %% m
+    for (i in 2:(N + 1)) {
+      res[i] <- (a * res[i - 1] + c) %% m
     }
     u <- res / m
     return(list(Res = res, U = u))
   }
 
-  MLehmer <- function(x0, c , N){
+  MLehmer <- function(x0, c, N) {
     n <- nchar(x0) # Longitud de x0
-    k <- nchar(c)  # Longitud de c
-    if(n < k){
+    k <- nchar(c) # Longitud de c
+    if (n < k) {
       return(-1)
     }
-    res <- numeric(N+1) # Contiene los xi
-    u <- numeric(N+1) # Contiene los ui
+    res <- numeric(N + 1) # Contiene los xi
+    u <- numeric(N + 1) # Contiene los ui
     res[1] <- x0
-    for(i in 2:(N+1))
-    {
-      num <- format(res[i-1]*c, scientific = FALSE) # Desactiva la notación científica y pone 0's a la izquierda
+    for (i in 2:(N + 1)) {
+      num <- format(res[i - 1] * c, scientific = FALSE) # Desactiva la notación científica y pone 0's a la izquierda
       dif <- n + k - nchar(num)
-      num_izq <- as.numeric(substr(num, 1, k-dif))  # Substrae k valores de la izquierda
-      num_der <- as.numeric(substr(num, k+1-dif, nchar(num))) # Substrae los valores de las cifras restantes
+      num_izq <- as.numeric(substr(num, 1, k - dif)) # Substrae k valores de la izquierda
+      num_der <- as.numeric(substr(num, k + 1 - dif, nchar(num))) # Substrae los valores de las cifras restantes
       res[i] <- num_der - num_izq
     }
     u <- res / (10^n)
     return(list(Res = res, U = u))
   }
 
-  MCM <- function(x0,N){
+  MCM <- function(x0, N) {
     n <- nchar(x0)
-    res <- numeric(N+1)
-    u <- numeric(N+1)
+    res <- numeric(N + 1)
+    u <- numeric(N + 1)
     res[1] <- x0
-    for(i in 2:(N+1)){
-      cuad <- format(res[i-1]^2, scientific = FALSE)
-      dif <- 2*n - nchar(cuad)
-      poscentral <- floor(nchar(cuad)/2)
-      res[i] <-as.numeric(substr(cuad, poscentral - n/2 +1 - ifelse(dif%%2 != 0, dif-1, dif ), poscentral + n/2 - ifelse(dif%%2 != 0, dif-1, dif)))
+    for (i in 2:(N + 1)) {
+      cuad <- format(res[i - 1]^2, scientific = FALSE)
+      dif <- 2 * n - nchar(cuad)
+      poscentral <- floor(nchar(cuad) / 2)
+      res[i] <- as.numeric(substr(
+        cuad,
+        poscentral - n / 2 + 1 - ifelse(dif %% 2 != 0, dif - 1, dif),
+        poscentral + n / 2 - ifelse(dif %% 2 != 0, dif - 1, dif)
+      ))
     }
     u <- res / (10^n)
     return(list(Res = res, U = u))
@@ -179,26 +182,32 @@ server <- function(input, output, session) {
       a <- input$cont_lim_inf
       b <- input$cont_lim_sup
       expr_str <- input$cont_f_densidad
-      
+
       # Transformación inversa numérica aproximada para f(x) en [a, b]
       U <- runif(n_sim)
       # Generamos una malla fina para evaluar la CDF acumulada numérica
       grid_x <- seq(a, b, length.out = 1000)
-      f_eval <- tryCatch({
-        sapply(grid_x, function(x) eval(parse(text = expr_str)))
-      }, error = function(e) NULL)
-      
-      validate(need(!is.null(f_eval), "Error en la expresión de la densidad f(x). Verifica la sintaxis."))
-      
+      f_eval <- tryCatch(
+        {
+          sapply(grid_x, function(x) eval(parse(text = expr_str)))
+        },
+        error = function(e) NULL
+      )
+
+      validate(need(
+        !is.null(f_eval),
+        "Error en la expresión de la densidad f(x). Verifica la sintaxis."
+      ))
+
       # Normalizamos por si acaso el área no es exactamente 1 en el soporte dado
       dx <- grid_x[2] - grid_x[1]
       area <- sum(f_eval) * dx
       f_eval_norm <- f_eval / area
-      
+
       # Construir CDF empírica numérica en la malla
       cdf_eval <- cumsum(f_eval_norm) * dx
       cdf_eval[length(cdf_eval)] <- 1 # Asegurar 1 al final
-      
+
       # Método de Transformación Inversa por interpolación lineal
       muestra <- approx(x = cdf_eval, y = grid_x, xout = U, rule = 2)$y
       f_teorica <- function(x) {
@@ -206,10 +215,16 @@ server <- function(input, output, session) {
       }
       F_teorica <- function(x) {
         sapply(x, function(val) {
-          if (val <= a) return(0)
-          if (val >= b) return(1)
+          if (val <= a) {
+            return(0)
+          }
+          if (val >= b) {
+            return(1)
+          }
           sub_grid <- grid_x[grid_x <= val]
-          if(length(sub_grid) == 0) return(0)
+          if (length(sub_grid) == 0) {
+            return(0)
+          }
           sub_f <- f_eval_norm[1:length(sub_grid)]
           sum(sub_f) * dx
         })
@@ -299,7 +314,13 @@ server <- function(input, output, session) {
     N <- input$gen_n
     x0 <- input$gen_semilla
     if (metodo == "mcl") {
-      resultado <- MCL(x0 = x0, a = input$gen_a, c = input$gen_c, m = input$gen_m,N = N)
+      resultado <- MCL(
+        x0 = x0,
+        a = input$gen_a,
+        c = input$gen_c,
+        m = input$gen_m,
+        N = N
+      )
     } else if (metodo == "lehmer") {
       resultado <- MLehmer(x0 = x0, c = input$gen_c, N = N)
     } else if (metodo == "cuadrados") {
@@ -371,9 +392,22 @@ server <- function(input, output, session) {
     u <- switch(
       input$test_origen,
       "p1" = {
+        validate(need(
+          input$gen_calcular > 0,
+          "Primero genera los números en la Pestaña 1 (botón Calcular)."
+        ))
         res_p1 <- datos_pseudoaleatorios()
-        req(res_p1, res_p1$muestra)
-        as.numeric(res_p1$muestra)
+        validate(need(
+          is.list(res_p1),
+          "Error en los parámetros del generador de la Pestaña 1 (ej. longitud de semilla < constante)."
+        ))
+        v <- as.numeric(res_p1$U[-1])
+        v <- v[is.finite(v)]
+        validate(need(
+          all(v >= 0 & v < 1),
+          "El generador produjo valores fuera de [0,1). Revisa los parámetros de la Pestaña 1."
+        ))
+        v
       },
       "archivo" = {
         req(input$test_file)
@@ -420,10 +454,24 @@ server <- function(input, output, session) {
     resultado <- resultado$U[-1]
     df <- data.frame(valores = resultado)
     p <- ggplot(df, aes(x = valores)) +
-      geom_histogram(aes(y = after_stat(density)), 
-                     fill = "#18bc9c",color = "white",bins = 15,alpha = 0.8) +
-      stat_function(fun = dunif, args = list(min = 0, max = 1), color = "#8e44ad", linewidth = 1) +
-      labs(title = 'Números Aleatorios Generados',x = 'Valores generados',y = "Densidad") +
+      geom_histogram(
+        aes(y = after_stat(density)),
+        fill = "#18bc9c",
+        color = "white",
+        bins = 15,
+        alpha = 0.8
+      ) +
+      stat_function(
+        fun = dunif,
+        args = list(min = 0, max = 1),
+        color = "#8e44ad",
+        linewidth = 1
+      ) +
+      labs(
+        title = 'Números Aleatorios Generados',
+        x = 'Valores generados',
+        y = "Densidad"
+      ) +
       theme_minimal()
     ggplotly(p)
   })
@@ -437,7 +485,7 @@ server <- function(input, output, session) {
     print(summary(x))
     cat("Esperanza:", mean(x), "\n")
     cat("Varianza:", var(x), "\n")
-    
+
     cat("\nVALORES NORMALIZADOS\n")
     print(summary(u))
     cat("Esperanza:", mean(u), "\n")
@@ -448,7 +496,7 @@ server <- function(input, output, session) {
     resultado <- datos_pseudoaleatorios()
     req(resultado)
     data.frame(
-      Iteracion = 0:(length(resultado$U)-1),
+      Iteracion = 0:(length(resultado$U) - 1),
       Valor_Res = resultado$Res,
       Valor_U = resultado$U
     )
@@ -462,7 +510,7 @@ server <- function(input, output, session) {
     content = function(file) {
       resultado <- datos_pseudoaleatorios()
       datos <- data.frame(
-        Iteracion = 0:(length(resultado$U)-1),
+        Iteracion = 0:(length(resultado$U) - 1),
         Valor_Res = resultado$Res,
         Valor_U = resultado$U
       )
@@ -477,7 +525,7 @@ server <- function(input, output, session) {
     content = function(file) {
       resultado <- datos_pseudoaleatorios()
       datos <- data.frame(
-        Iteracion = 0:(length(resultado$U)-1),
+        Iteracion = 0:(length(resultado$U) - 1),
         Valor_Res = resultado$Res,
         Valor_U = resultado$U
       )
@@ -622,7 +670,13 @@ server <- function(input, output, session) {
     req(res)
     df <- data.frame(valores = res$muestra)
     p <- ggplot(df, aes(x = valores)) +
-      geom_histogram(aes(y = after_stat(density)), fill = "#18bc9c", color = "white", bins = 25, alpha = 0.7) +
+      geom_histogram(
+        aes(y = after_stat(density)),
+        fill = "#18bc9c",
+        color = "white",
+        bins = 25,
+        alpha = 0.7
+      ) +
       stat_function(fun = res$f_teorica, color = "#8e44ad", linewidth = 1.2) +
       labs(
         title = "Histograma y Densidad Teórica",
@@ -639,7 +693,12 @@ server <- function(input, output, session) {
     df <- data.frame(valores = res$muestra)
     p <- ggplot(df, aes(x = valores)) +
       stat_ecdf(geom = "step", color = "#18bc9c", linewidth = 1) +
-      stat_function(fun = res$F_teorica, color = "#8e44ad", linewidth = 1.1, linetype = "dashed") +
+      stat_function(
+        fun = res$F_teorica,
+        color = "#8e44ad",
+        linewidth = 1.1,
+        linetype = "dashed"
+      ) +
       labs(
         title = "Función de Distribución Acumulada (CDF)",
         x = "x",
@@ -744,22 +803,15 @@ server <- function(input, output, session) {
         fill = "Frecuencia"
       ) +
       theme_minimal()
-    
+
     # A
     # No hay que buscar segundos motivos en miaw
     # No ponerlo a prueba
-    # 
-    
-    ------
-      
+    #
+
     # M
     # Hacerle saber a miaw cuando las cosas no se sienten bien y posponer el problema
-    
-      
-    ------ 
-      - 
-  
-      
+
     ggplotly(p)
   })
 }
