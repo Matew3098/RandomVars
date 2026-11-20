@@ -36,20 +36,26 @@ ui <- navbarPage(
           step = 10
         ),
         numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
+        
         conditionalPanel(
           condition = "input.gen_metodo == 'mcl'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 1000, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
           numericInput("gen_a", "Multiplicador (a):", value = 1664525),
-          numericInput("gen_m", "Módulo (m):", value = 2^32)
+          numericInput("gen_c", "Incremento (c):", value = 1013904223),
+          numericInput("gen_m", "Módulo (m):", value = 2^32),
         ),
         conditionalPanel(
-          condition = "input.gen_metodo != 'cuadrados'",
-          numericInput(
-            "gen_c",
-            "Incremento / Constante (c):",
-            value = 1013904223
-          )
+          condition = "input.gen_metodo == 'lehmer'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 100, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 4122),
+          numericInput("gen_c", "Constante (c):", value = 76),
         ),
-
+        conditionalPanel(
+          condition = "input.gen_metodo == 'cuadrados'",
+          numericInput("gen_n", "Cantidad de números (N):", value = 50, min = 10, step = 10),
+          numericInput("gen_semilla", "Semilla inicial (x0):", value = 12345),
+        ),
         hr(),
         actionButton(
           "gen_calcular",
