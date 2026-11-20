@@ -803,15 +803,6 @@ server <- function(input, output, session) {
         fill = "Frecuencia"
       ) +
       theme_minimal()
-
-    # A
-    # No hay que buscar segundos motivos en miaw
-    # No ponerlo a prueba
-    #
-
-    # M
-    # Hacerle saber a miaw cuando las cosas no se sienten bien y posponer el problema
-
     ggplotly(p)
   })
 }
