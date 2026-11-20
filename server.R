@@ -312,19 +312,18 @@ server <- function(input, output, session) {
   datos_pseudoaleatorios <- eventReactive(input$gen_calcular, {
     metodo <- input$gen_metodo
     N <- input$gen_n
-    x0 <- input$gen_semilla
     if (metodo == "mcl") {
       resultado <- MCL(
-        x0 = x0,
+        x0 = input$gen_semilla_m,
         a = input$gen_a,
-        c = input$gen_c,
+        c = input$gen_c_m,
         m = input$gen_m,
         N = N
       )
     } else if (metodo == "lehmer") {
-      resultado <- MLehmer(x0 = x0, c = input$gen_c, N = N)
+      resultado <- MLehmer(x0 = input$gen_semilla_l, c = input$gen_c_l, N = N)
     } else if (metodo == "cuadrados") {
-      resultado <- MCM(x0 = x0, N = N)
+      resultado <- MCM(x0 = input$gen_semilla_c, N = N)
     }
     return(resultado)
   })
