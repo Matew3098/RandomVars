@@ -787,7 +787,7 @@ server <- function(input, output, session) {
       valor = res$datos
     )
     p <- ggplot(df_seq, aes(x = indice, y = valor)) +
-      geom_bin2d(bins = 50) +
+      geom_point(color = "#2c3e50", alpha = 0.25, size = 1) +
       scale_fill_gradient(low = "#e8f8f5", high = "#18bc9c") +
       geom_hline(
         yintercept = 0.5,
