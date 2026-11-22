@@ -35,7 +35,7 @@ ui <- navbarPage(
           min = 10,
           step = 10
         ),
-        
+
         conditionalPanel(
           condition = "input.gen_metodo == 'mcl'",
           numericInput("gen_semilla_m", "Semilla inicial (x0):", value = 12345),
@@ -61,7 +61,7 @@ ui <- navbarPage(
         hr(),
         h4("Exportación"),
         downloadButton("dl_excel", "Descargar .xlsx", class = "w-100 mb-2"),
-        downloadButton("dl_txt", "Descargar .txt / .csv", class = "w-100")
+        downloadButton("dl_txt", "Descargar .txt", class = "w-100")
       ),
       mainPanel(
         width = 9,
@@ -299,7 +299,7 @@ ui <- navbarPage(
           class = "w-100 mb-2"
         ),
         # Antes era "dl_txt" (duplicado con la Pestaña 1); el servidor define cont_dl_txt
-        downloadButton("cont_dl_txt", "Descargar .txt / .csv", class = "w-100")
+        downloadButton("cont_dl_txt", "Descargar .txt", class = "w-100")
       ),
       mainPanel(
         width = 9,
