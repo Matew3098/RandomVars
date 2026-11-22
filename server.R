@@ -3,6 +3,7 @@ library(ggplot2)
 library(nortest)
 library(tseries)
 library(openxlsx)
+library(writexl)
 library(plotly)
 
 mti <- function(n, probs, labels) {
@@ -86,29 +87,31 @@ server <- function(input, output, session) {
       }
     )
 
-    if (!is.null(f)) {
-      a <- input$mc_a
-      b <- input$mc_b
-      N <- input$mc_N
-
-      U <- runif(N)
-      x <- a + (b - a) * U
-      y <- tryCatch(f(x), error = function(e) NULL)
-
-      if (is.null(y)) {
-        return(list(
-          valido = FALSE,
-          mensaje = "La función ingresada no es válida. Verifica su expresión."
-        ))
-      }
-
-      int_estimada <- mean(y) * (b - a)
-      int_real <- tryCatch(
-        integrate(f, lower = a, upper = b)$value,
-        error = function(e) NA
-      )
-      evolucion <- (b - a) * cumsum(y) / (1:N)
+    if (is.null(f)) {
+      return(list(
+        valido = FALSE,
+        mensaje = "La función ingresada no es válida. Verifica su expresión."
+      ))
     }
+
+    U <- runif(N)
+    x <- a + (b - a) * U
+    y <- tryCatch(f(x), error = function(e) NULL)
+
+    if (is.null(y) || length(y) != N || any(!is.finite(y))) {
+      return(list(
+        valido = FALSE,
+        mensaje = "La función ingresada no es válida o produce valores no finitos en [a, b]."
+      ))
+    }
+
+    int_estimada <- mean(y) * (b - a)
+    int_real <- tryCatch(
+      integrate(f, lower = a, upper = b)$value,
+      error = function(e) NA
+    )
+    evolucion <- (b - a) * cumsum(y) / (1:N)
+    error_std_est <- if (N > 1) (b - a) * sd(y) / sqrt(N) else NA_real_
 
     return(list(
       valido = TRUE,
@@ -121,7 +124,7 @@ server <- function(input, output, session) {
       x_sim = x,
       y_sim = y,
       int_estimada = int_estimada,
-      error_std = abs(int_estimada - int_real),
+      error_std = error_std_est,
       ref = int_real,
       conv_estimates = evolucion
     ))
@@ -133,25 +136,48 @@ server <- function(input, output, session) {
       tipo,
       "binomial" = {
         rbinom(
-          n = input$disc_n_sim,
+          n = n_sim,
           size = input$disc_binom_size,
           p = input$disc_binom_prob
         )
       },
       "poisson" = {
-        rpois(n = input$disc_n_sim, lambda = input$disc_pois_lambda)
+        rpois(n = n_sim, lambda = input$disc_pois_lambda)
       },
       "geometrica" = {
-        rgeom(n = input$disc_n_sim, prob = input$disc_geom_prob)
+        rgeom(n = n_sim, prob = input$disc_geom_prob)
       },
       "personalizada" = {
-        vals <- as.numeric(unlist(strsplit(input$disc_vals, ",")))
-        probs <- as.numeric(unlist(strsplit(input$disc_probs, ",")))
-        if (abs(sum(probs) - 1) < 1e-6) {
-          mti(n = input$disc_n_sim, probs = probs, labels = vals)
-        } else {
-          stop("Las probabilidades ingresadas no suman 1.")
-        }
+        vals <- suppressWarnings(as.numeric(unlist(strsplit(
+          input$disc_vals,
+          ","
+        ))))
+        probs <- suppressWarnings(as.numeric(unlist(strsplit(
+          input$disc_probs,
+          ","
+        ))))
+
+        validate(
+          need(
+            length(vals) > 0 && length(probs) > 0,
+            "Ingresa valores y probabilidades válidos."
+          ),
+          need(
+            length(vals) == length(probs),
+            "La cantidad de valores X y probabilidades debe ser igual."
+          ),
+          need(
+            !any(is.na(vals)) && !any(is.na(probs)),
+            "Asegúrate de que todos los valores y probabilidades sean numéricos."
+          ),
+          need(all(probs >= 0), "Las probabilidades no pueden ser negativas."),
+          need(
+            abs(sum(probs) - 1) < 1e-6,
+            "Las probabilidades ingresadas no suman 1."
+          )
+        )
+
+        mti(n = n_sim, probs = probs, labels = vals)
       },
       stop("Tipo de distribución no reconocido")
     )
@@ -519,7 +545,7 @@ server <- function(input, output, session) {
 
   output$dl_txt <- downloadHandler(
     filename = function() {
-      paste0("Num_Aleatorios_", Sys.Date(), ".csv")
+      paste0("Num_Aleatorios_", Sys.Date(), ".txt")
     },
     content = function(file) {
       resultado <- datos_pseudoaleatorios()
@@ -528,7 +554,7 @@ server <- function(input, output, session) {
         Valor_Res = resultado$Res,
         Valor_U = resultado$U
       )
-      write.csv(datos, file, row.names = FALSE)
+      write.table(datos, file, sep = "\t", row.names = FALSE)
     }
   )
 
@@ -581,7 +607,7 @@ server <- function(input, output, session) {
     req(res)
     cat('El valor aproximado es: ', res$int_estimada, '\n')
     cat('El error estandar es: ', res$error_std, '\n')
-    cat('EL valor real es', res$ref, '\n')
+    cat('El valor real es', res$ref, '\n')
   })
 
   # =========================================================================
@@ -650,13 +676,13 @@ server <- function(input, output, session) {
     filename = function() {
       res <- datos_discretos()
       tipo_str <- if (!is.null(res$tipo)) res$tipo else "discreta"
-      paste0("Datos_aleatorios_", tipo_str, "_", Sys.Date(), ".csv")
+      paste0("Datos_aleatorios_", tipo_str, "_", Sys.Date(), ".txt")
     },
     content = function(file) {
       res <- datos_discretos()
       req(res, res$muestra)
       df <- data.frame(simulacion = seq_along(res$muestra), valor = res$muestra)
-      write.csv(df, file = file, row.names = FALSE)
+      write.table(df, file, sep = "\t", row.names = FALSE)
     }
   )
 
@@ -725,13 +751,13 @@ server <- function(input, output, session) {
     filename = function() {
       res <- datos_continuos()
       tipo_str <- if (!is.null(res$tipo)) res$tipo else "continua"
-      paste0("var_continua_", tipo_str, "_", Sys.Date(), ".csv")
+      paste0("var_continua_", tipo_str, "_", Sys.Date(), ".txt")
     },
     content = function(file) {
       res <- datos_continuos()
       req(res)
       df <- data.frame(Simulacion = seq_along(res$muestra), Valor = res$muestra)
-      write.csv(df, file, row.names = FALSE)
+      write.table(df, file, sep = "\t", row.names = FALSE)
     }
   )
 
@@ -770,8 +796,8 @@ server <- function(input, output, session) {
       ) +
       coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +
       labs(
-        title = "Q-Q Plot Uniforme(0, 1)",
-        x = "Cuantiles Teóricos U(0,1)",
+        title = "Q-Q Plot: Cuantiles Empíricos vs. U(0,1)",
+        x = "Cuantiles Teóricos F⁻¹(p)",
         y = "Cuantiles Empíricos"
       ) +
       theme_minimal()
@@ -780,26 +806,20 @@ server <- function(input, output, session) {
 
   output$test_plot_2 <- renderPlotly({
     res <- datos_diagnostico()
-    req(res, res$datos)
-    df_seq <- data.frame(
-      indice = seq_along(res$datos),
-      valor = res$datos
+    req(res, res$datos, length(res$datos) >= 2)
+    u <- res$datos
+    df_lag <- data.frame(
+      u_prev = u[-length(u)],
+      u_curr = u[-1]
     )
-    p <- ggplot(df_seq, aes(x = indice, y = valor)) +
-      geom_point(color = "#2c3e50", alpha = 0.25, size = 1) +
-      scale_fill_gradient(low = "#e8f8f5", high = "#18bc9c") +
-      geom_hline(
-        yintercept = 0.5,
-        color = "#8e44ad",
-        linetype = "dashed",
-        linewidth = 0.9
-      ) +
-      coord_cartesian(ylim = c(0, 1)) +
+    r1 <- suppressWarnings(cor(df_lag$u_prev, df_lag$u_curr))
+    p <- ggplot(df_lag, aes(x = u_prev, y = u_curr)) +
+      geom_point(color = "#2c3e50", alpha = 0.3, size = 1.4) +
+      coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +
       labs(
-        title = "Dispersión Secuencial (Densidad)",
-        x = "Índice (i)",
-        y = "Valor U_i",
-        fill = "Frecuencia"
+        title = paste0("Gráfico de Rezagos (r₁ = ", round(r1, 4), ")"),
+        x = "U_{i-1}",
+        y = "U_i"
       ) +
       theme_minimal()
     ggplotly(p)
