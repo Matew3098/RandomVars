@@ -1,51 +1,121 @@
-Aplicación interactiva desarrollada en **R Shiny** para explorar métodos de simulación estocástica y métodos numéricos. Permite generar números pseudoaleatorios, simular variables aleatorias, aproximar integrales mediante Montecarlo y evaluar propiedades estadísticas de secuencias generadas.
+# RandomVars
+
+Aplicación interactiva desarrollada en **R Shiny** para explorar y experimentar con métodos de simulación estocástica y métodos numéricos.
+
+La aplicación permite generar números pseudoaleatorios, simular variables aleatorias discretas y continuas, aproximar integrales mediante el método de Montecarlo y evaluar propiedades estadísticas de secuencias generadas.
 
 ## Funcionalidades
 
 La aplicación cuenta con cinco módulos principales:
 
-1. **Números pseudoaleatorios:** implementación de los métodos Congruencial Lineal, Lehmer y Cuadrados Medios, con visualizaciones y exportación de resultados.
-2. **Integración Montecarlo:** aproximación de integrales definidas mediante simulación, gráficos de convergencia y estimación del error.
-3. **Variables aleatorias discretas:** simulación de distribuciones Binomial, Poisson, Geométrica y distribuciones personalizadas.
-4. **Variables aleatorias continuas:** simulación de distribuciones Uniforme, Exponencial, Normal y distribuciones personalizadas.
-5. **Bondad de ajuste y diagnóstico:** aplicación de las pruebas Kolmogorov-Smirnov y Rachas para evaluar muestras y secuencias aleatorias.
+### 1. Números pseudoaleatorios
 
-## Ejecución local
+Implementación de diferentes métodos para la generación de números pseudoaleatorios:
 
-1. Clonar el repositorio:
+- Método Congruencial Lineal.
+- Método de Lehmer.
+- Método de Cuadrados Medios.
 
-   ```bash
-   git clone <URL_DEL_REPOSITORIO>
-   ```
+Incluye visualizaciones de las secuencias generadas y opciones para exportar los resultados.
 
-2. Abrir el proyecto en RStudio o acceder a su directorio:
+### 2. Integración Montecarlo
 
-   ```bash
-   cd <NOMBRE_DEL_REPOSITORIO>
-   ```
+Aproximación numérica de integrales definidas mediante simulación de Montecarlo.
 
-3. Instalar los paquetes necesarios (si aún no están instalados):
+Incluye:
+- Gráficos de convergencia.
+- Estimación del error de aproximación.
+- Opciones para trabajar con integrales impropias.
 
-   ```r
-   install.packages(c(
-     "shiny",
-     "bslib",
-     "ggplot2",
-     "DT",
-     "readxl",
-     "writexl"
-   ))
-   ```
+### 3. Variables aleatorias discretas
 
-4. Ejecutar la aplicación:
+Simulación de variables aleatorias a partir de diferentes distribuciones:
 
-   ```r
-   shiny::runApp()
-   ```
+- Binomial.
+- Poisson.
+- Geométrica.
+- Distribuciones personalizadas.
+
+### 4. Variables aleatorias continuas
+
+Generación y simulación de variables aleatorias continuas mediante:
+
+- Uniforme.
+- Exponencial.
+- Normal.
+- Distribuciones personalizadas.
+
+### 5. Bondad de ajuste y diagnóstico
+
+Evaluación de las propiedades estadísticas de muestras y secuencias aleatorias mediante pruebas estadísticas:
+
+- Prueba de Kolmogorov-Smirnov.
+- Prueba de Rachas.
+
+## Tecnologías y dependencias
+
+El proyecto está desarrollado utilizando **R** y el framework **Shiny**.
+
+Los principales paquetes utilizados son:
+
+- `shiny`: desarrollo de aplicaciones web interactivas.
+- `bslib`: personalización de interfaces.
+- `ggplot2`: generación de gráficos estadísticos.
+- `readxl`: lectura de archivos Excel.
+- `writexl`: exportación de resultados a Excel.
+- `plotly`: visualizaciones interactivas.
+- `tseries`: herramientas para análisis de series temporales.
+
+## Instalación y ejecución local
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/Matew3098/RandomVars.git
+```
+
+### 2. Acceder al directorio del proyecto
+
+```bash
+cd RandomVars
+```
+
+### 3. Instalar las dependencias
+
+Desde la consola de R o RStudio, ejecutar:
+
+```r
+install.packages(c(
+  "shiny",
+  "bslib",
+  "ggplot2",
+  "readxl",
+  "writexl",
+  "plotly",
+  "tseries"
+))
+```
+
+### 4. Ejecutar la aplicación
+
+Ubicarse en el directorio raíz del proyecto y ejecutar:
+
+```r
+shiny::runApp()
+```
+
+La aplicación se iniciará en el navegador web predeterminado o en el visor de RStudio.
+
+Imagen de funcionamiento del módulo Variables discretas:
+<img width="1295" height="636" alt="image" src="https://github.com/user-attachments/assets/eeee62a9-ce94-4dde-922e-bc616cec9306" />
 
 ## Autores
 
-Cárdenas Mateo, Milena Palacios
+- Mateo Cárdenas
+- Milena Palacios
 
-**Asignatura:** Simulación  
-**Semestre:** 2026-B
+## Información académica
+
+- **Asignatura:** Simulación.
+- **Semestre:** 2026-B.
+
