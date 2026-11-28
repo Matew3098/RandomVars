@@ -85,15 +85,7 @@ cd RandomVars
 Desde la consola de R o RStudio, ejecutar:
 
 ```r
-install.packages(c(
-  "shiny",
-  "bslib",
-  "ggplot2",
-  "readxl",
-  "writexl",
-  "plotly",
-  "tseries"
-))
+source("install_packages.R")
 ```
 
 ### 4. Ejecutar la aplicación
