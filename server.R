@@ -77,7 +77,14 @@ server <- function(input, output, session) {
   }
 
   # Pestaña 2: Integración de Montecarlo
-  integrar_montecarlo <- function(expr_str, a, b, N) {
+  integrar_montecarlo <- function(
+    expr_str,
+    a,
+    b,
+    N,
+    lim_inf = "finito",
+    lim_sup = "finito"
+  ) {
     f <- tryCatch(
       {
         eval(parse(text = paste("function(x) {", expr_str, "}")))
@@ -94,31 +101,72 @@ server <- function(input, output, session) {
       ))
     }
 
-    U <- runif(N)
-    x <- a + (b - a) * U
-    y <- tryCatch(f(x), error = function(e) NULL)
+    # Tipo de integral según los radio buttons
+    a_inf <- identical(lim_inf, "inf")
+    b_inf <- identical(lim_sup, "inf")
+    a_real <- if (a_inf) -Inf else a
+    b_real <- if (b_inf) Inf else b
 
-    if (is.null(y) || length(y) != N || any(!is.finite(y))) {
+    U <- runif(N)
+
+    # Transformaciones a (0,1) (Ross, Simulación): int g(x)dx = int_0^1 h(u)du
+    # y se estima con mean(h(U)).
+    if (!a_inf && !b_inf) {
+      # Caso 1: [a, b] finito -> x = a + (b-a)u
+      metodo <- "Intervalo finito [a, b]: x = a + (b - a)u"
+      x <- a + (b - a) * U
+      y <- tryCatch(f(x), error = function(e) NULL)
+      h <- if (is.null(y) || length(y) != N) NULL else (b - a) * y
+      x_lim <- NULL
+    } else if (!a_inf && b_inf) {
+      # Caso 2: [a, +inf) -> y = 1/(x - a + 1), x = a + 1/u - 1, dx = du/u^2
+      metodo <- "Impropia [a, +Inf): x = a + 1/u - 1, dx = du/u^2"
+      x <- a + 1 / U - 1
+      y <- tryCatch(f(x), error = function(e) NULL)
+      h <- if (is.null(y) || length(y) != N) NULL else y / U^2
+      x_lim <- c(a, a + 20)
+    } else if (a_inf && !b_inf) {
+      # Caso 3: (-inf, b] -> y = 1/(b - x + 1), x = b - 1/u + 1, dx = du/u^2
+      metodo <- "Impropia (-Inf, b]: x = b - 1/u + 1, dx = du/u^2"
+      x <- b - 1 / U + 1
+      y <- tryCatch(f(x), error = function(e) NULL)
+      h <- if (is.null(y) || length(y) != N) NULL else y / U^2
+      x_lim <- c(b - 20, b)
+    } else {
+      # Caso 4: (-inf, +inf) -> x = (2u - 1)/(u(1 - u)),
+      # dx = (1 - 2u(1 - u)) / (u(1 - u))^2 du
+      metodo <- "Impropia (-Inf, +Inf): x = (2u - 1)/(u(1 - u))"
+      x <- (2 * U - 1) / (U * (1 - U))
+      y <- tryCatch(f(x), error = function(e) NULL)
+      h <- if (is.null(y) || length(y) != N) {
+        NULL
+      } else {
+        y * (1 - 2 * U * (1 - U)) / (U * (1 - U))^2
+      }
+      x_lim <- c(-20, 20)
+    }
+
+    if (is.null(h) || any(!is.finite(h))) {
       return(list(
         valido = FALSE,
-        mensaje = "La función ingresada no es válida o produce valores no finitos en [a, b]."
+        mensaje = "La función ingresada no es válida o produce valores no finitos en el dominio de integración."
       ))
     }
 
-    int_estimada <- mean(y) * (b - a)
+    int_estimada <- mean(h)
     int_real <- tryCatch(
-      integrate(f, lower = a, upper = b)$value,
+      integrate(f, lower = a_real, upper = b_real)$value,
       error = function(e) NA
     )
-    evolucion <- (b - a) * cumsum(y) / (1:N)
-    error_std_est <- if (N > 1) (b - a) * sd(y) / sqrt(N) else NA_real_
+    evolucion <- cumsum(h) / (1:N)
+    error_std_est <- if (N > 1) sd(h) / sqrt(N) else NA_real_
 
     return(list(
       valido = TRUE,
       mensaje = NULL,
       expr_str = expr_str,
-      a = a,
-      b = b,
+      a = a_real,
+      b = b_real,
       N = N,
       f = f,
       x_sim = x,
@@ -126,7 +174,9 @@ server <- function(input, output, session) {
       int_estimada = int_estimada,
       error_std = error_std_est,
       ref = int_real,
-      conv_estimates = evolucion
+      conv_estimates = evolucion,
+      metodo = metodo,
+      x_lim = x_lim
     ))
   }
 
@@ -361,7 +411,9 @@ server <- function(input, output, session) {
       expr_str = input$mc_funcion,
       a = input$mc_a,
       b = input$mc_b,
-      N = input$mc_N
+      N = input$mc_N,
+      lim_inf = if (is.null(input$mc_lim_inf)) "finito" else input$mc_lim_inf,
+      lim_sup = if (is.null(input$mc_lim_sup)) "finito" else input$mc_lim_sup
     )
     validate(
       need(
@@ -575,6 +627,9 @@ server <- function(input, output, session) {
         y = "f(X)"
       ) +
       theme_minimal()
+    if (!is.null(res$x_lim)) {
+      p <- p + coord_cartesian(xlim = res$x_lim)
+    }
     ggplotly(p)
   })
 
@@ -605,6 +660,7 @@ server <- function(input, output, session) {
   output$mc_resultados <- renderPrint({
     res <- datos_montecarlo()
     req(res)
+    cat('Método: ', res$metodo, '\n')
     cat('El valor aproximado es: ', res$int_estimada, '\n')
     cat('El error estandar es: ', res$error_std, '\n')
     cat('El valor real es', res$ref, '\n')

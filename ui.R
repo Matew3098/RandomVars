@@ -95,6 +95,18 @@ ui <- navbarPage(
         textInput("mc_funcion", "Expresión f(x):", value = "exp(-x^2)"),
         numericInput("mc_a", "Límite inferior (a):", value = 0),
         numericInput("mc_b", "Límite superior (b):", value = 1),
+        radioButtons(
+          "mc_lim_inf",
+          "Tipo de límite inferior:",
+          choices = c("a finito" = "finito", "a = −∞" = "inf"),
+          selected = "finito"
+        ),
+        radioButtons(
+          "mc_lim_sup",
+          "Tipo de límite superior:",
+          choices = c("b finito" = "finito", "b = +∞" = "inf"),
+          selected = "finito"
+        ),
         numericInput(
           "mc_N",
           "Número de puntos (N):",
